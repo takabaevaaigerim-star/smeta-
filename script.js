@@ -2,17 +2,18 @@
 (function () {
   "use strict";
 
-  const items = document.getElementById("items");
-  const template = document.getElementById("row-template");
-  const total = document.getElementById("total");
-  const addButton = document.getElementById("add-row");
-  const dateInput = document.getElementById("date");
-  const discountInput = document.getElementById("discount");
-  const vatInput = document.getElementById("vat");
-  const currencyInput = document.getElementById("currency");
-  const pdfButton = document.getElementById("save-pdf");
+  const $ = (id) => document.getElementById(id);
+  const items = $("items");
+  const template = $("row-template");
+  const total = $("total");
+  const discountInput = $("discount");
+  const vatInput = $("vat");
+  const currencyInput = $("currency");
+  const dateInput = $("date");
 
+  const STORAGE_KEY = "smeta-draft-v1";
   let rowNumber = 0;
+  let statusTimer;
 
   function today() {
     const now = new Date();
@@ -24,157 +25,202 @@
 
   function toNumber(raw) {
     if (raw == null) return 0;
-
     const text = String(raw)
       .replace(/\s/g, "")
       .replace(/[₸₽$€]/g, "")
       .replace(",", ".");
-
     if (!/^-?\d+(\.\d+)?$/.test(text)) return 0;
-
     const value = Number(text);
     return Number.isFinite(value) ? value : 0;
   }
 
-  function formatMoney(amount) {
+  function money(amount) {
     const safe = Number.isFinite(amount) ? amount : 0;
     const rounded = Math.round(safe);
-    const currency = currencyInput.value;
-
     const formatted = Math.abs(rounded)
       .toString()
       .replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 
     return (rounded < 0 ? "-" : "") +
-      formatted + " " + currency;
+      formatted + " " + currencyInput.value;
   }
 
   function rows() {
-    return items.querySelectorAll(".item");
+    return Array.from(items.querySelectorAll(".item"));
   }
 
-  function recalc() {
+  function calculate() {
     let sum = 0;
 
-    rows().forEach(function (row) {
-      const qty = toNumber(
-        row.querySelector(".js-qty").value
-      );
-      const price = toNumber(
-        row.querySelector(".js-price").value
-      );
+    rows().forEach((row) => {
+      const qty = toNumber(row.querySelector(".js-qty").value);
+      const price = toNumber(row.querySelector(".js-price").value);
+      const line = qty * price;
+      const safeLine = Number.isFinite(line) ? line : 0;
 
-      let line = qty * price;
-      if (!Number.isFinite(line)) line = 0;
-
-      sum += line;
-
-      row.querySelector(".js-sum").textContent =
-        formatMoney(line);
+      sum += safeLine;
+      row.querySelector(".js-sum").textContent = money(safeLine);
     });
 
     if (!Number.isFinite(sum)) sum = 0;
 
-    const discountPercent = Math.min(
+    const subtotal = Math.round(sum);
+    const discountRate = Math.min(
       100, Math.max(0, toNumber(discountInput.value))
     );
-    const vatPercent = Math.max(
-      0, toNumber(vatInput.value)
-    );
+    const vatRate = Math.max(0, toNumber(vatInput.value));
 
-    const subtotal = Math.round(sum);
-    const discount = Math.round(
-      subtotal * discountPercent / 100
-    );
+    const discount = Math.round(subtotal * discountRate / 100);
     const afterDiscount = subtotal - discount;
-    const vat = Math.round(
-      afterDiscount * vatPercent / 100
-    );
+    const vat = Math.round(afterDiscount * vatRate / 100);
     const finalTotal = afterDiscount + vat;
 
-    document.getElementById("subtotal").textContent =
-      formatMoney(subtotal);
-    document.getElementById("discount-amount").textContent =
-      formatMoney(-discount);
-    document.getElementById("after-discount").textContent =
-      formatMoney(afterDiscount);
-    document.getElementById("vat-amount").textContent =
-      formatMoney(vat);
+    $("subtotal").textContent = money(subtotal);
+    $("discount-amount").textContent = money(-discount);
+    $("after-discount").textContent = money(afterDiscount);
+    $("vat-amount").textContent = money(vat);
+    $("total").textContent = money(finalTotal);
 
-    document.getElementById("discount-row").hidden =
-      discount === 0;
-    document.getElementById("after-discount-row").hidden =
-      discount === 0;
-    document.getElementById("vat-row").hidden =
-      vat === 0;
+    $("discount-row").hidden = discount === 0;
+    $("after-discount-row").hidden = discount === 0;
+    $("vat-row").hidden = vat === 0;
 
-    total.textContent = formatMoney(finalTotal);
+    return {
+      subtotal,
+      discount,
+      afterDiscount,
+      vat,
+      finalTotal
+    };
   }
 
-  function addRow(focusName) {
-    const row = template.content
-      .firstElementChild.cloneNode(true);
-
+  function addRow(focusName = false, data = {}) {
+    const row = template.content.firstElementChild.cloneNode(true);
     rowNumber++;
 
-    const qty = row.querySelector(".js-qty");
-    const price = row.querySelector(".js-price");
-    const sum = row.querySelector(".js-sum");
+    row.querySelector(".js-qty").id = "qty-" + rowNumber;
+    row.querySelector(".js-price").id = "price-" + rowNumber;
+    row.querySelector(".js-sum").id = "sum-" + rowNumber;
 
-    qty.id = "qty-" + rowNumber;
-    price.id = "price-" + rowNumber;
-    sum.id = "sum-" + rowNumber;
+    row.querySelector(".js-name").value = data.name || "";
+    row.querySelector(".js-qty").value = data.qty ?? "";
+    row.querySelector(".js-price").value = data.price ?? "";
+    row.querySelector(".js-unit").value = data.unit || "шт";
 
     items.appendChild(row);
-    recalc();
+    calculate();
 
-    if (focusName) {
-      row.querySelector(".js-name").focus();
+    if (focusName) row.querySelector(".js-name").focus();
+  }
+
+  function getDraft() {
+    return {
+      from: $("from").value,
+      to: $("to").value,
+      number: $("number").value,
+      date: dateInput.value,
+      discount: discountInput.value,
+      vat: vatInput.value,
+      currency: currencyInput.value,
+      comment: $("comment").value,
+      positions: rows().map((row) => ({
+        name: row.querySelector(".js-name").value,
+        qty: row.querySelector(".js-qty").value,
+        unit: row.querySelector(".js-unit").value,
+        price: row.querySelector(".js-price").value
+      }))
+    };
+  }
+
+  function saveDraft() {
+    try {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify(getDraft())
+      );
+    } catch (error) {
+      console.warn("Не удалось сохранить черновик", error);
     }
   }
 
-  function clearRow(row) {
-    row.querySelector(".js-name").value = "";
-    row.querySelector(".js-qty").value = "";
-    row.querySelector(".js-price").value = "";
-    row.querySelector(".js-unit").value = "шт";
+  function restoreDraft() {
+    let draft;
+
+    try {
+      draft = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    } catch (error) {
+      draft = null;
+    }
+
+    if (!draft || typeof draft !== "object") {
+      dateInput.value = today();
+      addRow();
+      return;
+    }
+
+    $("from").value = draft.from || "";
+    $("to").value = draft.to || "";
+    $("number").value = draft.number || "1";
+    dateInput.value = draft.date || today();
+    discountInput.value = draft.discount ?? 0;
+    vatInput.value = draft.vat ?? 0;
+
+    if (["₸", "₽", "$", "€"].includes(draft.currency)) {
+      currencyInput.value = draft.currency;
+    }
+
+    $("comment").value = draft.comment || "";
+
+    if (Array.isArray(draft.positions) && draft.positions.length) {
+      draft.positions.forEach((position) => addRow(false, position));
+    } else {
+      addRow();
+    }
+
+    calculate();
   }
 
-  if (!dateInput.value) {
-    dateInput.value = today();
+  function update() {
+    calculate();
+    saveDraft();
   }
 
-  addButton.addEventListener("click", function () {
+  $("add-row").addEventListener("click", () => {
     addRow(true);
+    saveDraft();
   });
 
-  items.addEventListener("input", recalc);
-  items.addEventListener("change", recalc);
+  items.addEventListener("input", update);
+  items.addEventListener("change", update);
 
-  discountInput.addEventListener("input", recalc);
-  vatInput.addEventListener("input", recalc);
-  currencyInput.addEventListener("change", recalc);
+  document.querySelectorAll("input, select, textarea")
+    .forEach((field) => {
+      field.addEventListener("input", update);
+      field.addEventListener("change", update);
+    });
 
-  items.addEventListener("click", function (event) {
+  items.addEventListener("click", (event) => {
     const button = event.target.closest(".js-remove");
     if (!button) return;
 
     const row = button.closest(".item");
 
     if (rows().length === 1) {
-      clearRow(row);
+      row.querySelector(".js-name").value = "";
+      row.querySelector(".js-qty").value = "";
+      row.querySelector(".js-price").value = "";
+      row.querySelector(".js-unit").value = "шт";
     } else {
       row.remove();
     }
 
-    recalc();
+    update();
   });
 
-  items.addEventListener("keydown", function (event) {
-    if (
-      event.key !== "Enter" ||
-      event.target.closest("button")
-    ) return;
+  items.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" || event.target.closest("button")) {
+      return;
+    }
 
     const row = event.target.closest(".item");
     const list = rows();
@@ -183,30 +229,125 @@
 
     event.preventDefault();
     addRow(true);
+    saveDraft();
   });
 
-  // Сохранение сметы в PDF через печать браузера
-  pdfButton.addEventListener("click", function () {
-    recalc();
+  $("new-estimate").addEventListener("click", () => {
+    if (!confirm("Создать новую смету? Текущий черновик будет очищен.")) {
+      return;
+    }
+
+    const nextNumber = (parseInt($("number").value, 10) || 0) + 1;
+
+    $("from").value = "";
+    $("to").value = "";
+    $("number").value = String(nextNumber);
+    dateInput.value = today();
+    discountInput.value = "0";
+    vatInput.value = "0";
+    currencyInput.value = "₸";
+    $("comment").value = "";
+
+    rows().forEach((row) => row.remove());
+    addRow();
+
+    $("copy-fallback").hidden = true;
+    $("copy-status").textContent = "";
+
+    update();
+  });
+
+  function whatsappText() {
+    const result = calculate();
+
+    const lines = [
+      "Смета № " + ($("number").value || "—") +
+      " от " + (dateInput.value || "—"),
+      "",
+      "От кого: " + ($("from").value || "—"),
+      "Для кого: " + ($("to").value || "—"),
+      ""
+    ];
+
+    rows().forEach((row) => {
+      const name = row.querySelector(".js-name").value || "Без названия";
+      const qty = toNumber(row.querySelector(".js-qty").value);
+      const unit = row.querySelector(".js-unit").value;
+      const price = toNumber(row.querySelector(".js-price").value);
+      const line = qty * price;
+
+      lines.push(
+        "• " + name + " — " + qty + " " + unit +
+        " × " + money(price) + " = " + money(line)
+      );
+    });
+
+    lines.push("", "Сумма: " + money(result.subtotal));
+
+    if (result.discount !== 0) {
+      lines.push("Скидка: " + money(-result.discount));
+      lines.push(
+        "Сумма со скидкой: " + money(result.afterDiscount)
+      );
+    }
+
+    if (result.vat !== 0) {
+      lines.push("НДС: " + money(result.vat));
+    }
+
+    lines.push("Итого к оплате: " + money(result.finalTotal));
+
+    if ($("comment").value.trim()) {
+      lines.push("", "Комментарий: " + $("comment").value.trim());
+    }
+
+    return lines.join("\n");
+  }
+
+  $("copy-whatsapp").addEventListener("click", async () => {
+    const text = whatsappText();
+
+    try {
+      if (!navigator.clipboard?.writeText) {
+        throw new Error("Буфер обмена недоступен");
+      }
+
+      await navigator.clipboard.writeText(text);
+
+      $("copy-fallback").hidden = true;
+      $("copy-status").textContent = "Скопировано ✓";
+
+      clearTimeout(statusTimer);
+      statusTimer = setTimeout(() => {
+        $("copy-status").textContent = "";
+      }, 2000);
+    } catch (error) {
+      $("copy-fallback").hidden = false;
+      $("copy-text").value = text;
+      $("copy-text").focus();
+      $("copy-text").select();
+      $("copy-status").textContent =
+        "Выделите текст и скопируйте вручную (⌘ + C).";
+    }
+  });
+
+  $("save-pdf").addEventListener("click", () => {
+    calculate();
     window.print();
   });
 
-  // Заголовок для печати
-  function updatePrintTitle() {
-    const number =
-      document.getElementById("number").value || "—";
+  window.addEventListener("beforeprint", () => {
+    const number = $("number").value || "—";
     const date = dateInput.value || "—";
 
     document.querySelector(".hero h1").textContent =
       "Смета № " + number + " от " + date;
-  }
+  });
 
-  window.addEventListener("beforeprint", updatePrintTitle);
-
-  window.addEventListener("afterprint", function () {
+  window.addEventListener("afterprint", () => {
     document.querySelector(".hero h1").textContent =
       "Смета за 5 минут";
   });
 
-  addRow(false);
+  restoreDraft();
 })();
