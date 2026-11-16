@@ -2,21 +2,21 @@
 (function () {
   "use strict";
 
-  var items = document.getElementById("items");
-  var template = document.getElementById("row-template");
-  var total = document.getElementById("total");
-  var addButton = document.getElementById("add-row");
-  var dateInput = document.getElementById("date");
+  const items = document.getElementById("items");
+  const template = document.getElementById("row-template");
+  const total = document.getElementById("total");
+  const addButton = document.getElementById("add-row");
+  const dateInput = document.getElementById("date");
+  const discountInput = document.getElementById("discount");
+  const vatInput = document.getElementById("vat");
+  const currencyInput = document.getElementById("currency");
+  const pdfButton = document.getElementById("save-pdf");
 
-  var discountInput = document.getElementById("discount");
-  var vatInput = document.getElementById("vat");
-  var currencyInput = document.getElementById("currency");
-
-  var rowNumber = 0;
+  let rowNumber = 0;
 
   function today() {
-    var now = new Date();
-    var local = new Date(
+    const now = new Date();
+    const local = new Date(
       now.getTime() - now.getTimezoneOffset() * 60000
     );
     return local.toISOString().slice(0, 10);
@@ -25,23 +25,23 @@
   function toNumber(raw) {
     if (raw == null) return 0;
 
-    var text = String(raw)
+    const text = String(raw)
       .replace(/\s/g, "")
       .replace(/[₸₽$€]/g, "")
       .replace(",", ".");
 
     if (!/^-?\d+(\.\d+)?$/.test(text)) return 0;
 
-    var value = Number(text);
+    const value = Number(text);
     return Number.isFinite(value) ? value : 0;
   }
 
   function formatMoney(amount) {
-    var safe = Number.isFinite(amount) ? amount : 0;
-    var rounded = Math.round(safe);
-    var currency = currencyInput.value;
+    const safe = Number.isFinite(amount) ? amount : 0;
+    const rounded = Math.round(safe);
+    const currency = currencyInput.value;
 
-    var formatted = Math.abs(rounded)
+    const formatted = Math.abs(rounded)
       .toString()
       .replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 
@@ -54,66 +54,57 @@
   }
 
   function recalc() {
-    var sum = 0;
-    var list = rows();
+    let sum = 0;
 
-    for (var i = 0; i < list.length; i++) {
-      var qty = toNumber(
-        list[i].querySelector(".js-qty").value
+    rows().forEach(function (row) {
+      const qty = toNumber(
+        row.querySelector(".js-qty").value
       );
-      var price = toNumber(
-        list[i].querySelector(".js-price").value
+      const price = toNumber(
+        row.querySelector(".js-price").value
       );
 
-      var line = qty * price;
+      let line = qty * price;
       if (!Number.isFinite(line)) line = 0;
 
       sum += line;
 
-      list[i].querySelector(".js-sum").textContent =
+      row.querySelector(".js-sum").textContent =
         formatMoney(line);
-    }
+    });
 
     if (!Number.isFinite(sum)) sum = 0;
 
-    var discountPercent = Math.min(
+    const discountPercent = Math.min(
       100, Math.max(0, toNumber(discountInput.value))
     );
-
-    var vatPercent = Math.max(
+    const vatPercent = Math.max(
       0, toNumber(vatInput.value)
     );
 
-    var subtotal = Math.round(sum);
-    var discount = Math.round(
+    const subtotal = Math.round(sum);
+    const discount = Math.round(
       subtotal * discountPercent / 100
     );
-
-    var afterDiscount = subtotal - discount;
-    var vat = Math.round(
+    const afterDiscount = subtotal - discount;
+    const vat = Math.round(
       afterDiscount * vatPercent / 100
     );
-
-    var finalTotal = afterDiscount + vat;
+    const finalTotal = afterDiscount + vat;
 
     document.getElementById("subtotal").textContent =
       formatMoney(subtotal);
-
     document.getElementById("discount-amount").textContent =
       formatMoney(-discount);
-
     document.getElementById("after-discount").textContent =
       formatMoney(afterDiscount);
-
     document.getElementById("vat-amount").textContent =
       formatMoney(vat);
 
     document.getElementById("discount-row").hidden =
       discount === 0;
-
     document.getElementById("after-discount-row").hidden =
       discount === 0;
-
     document.getElementById("vat-row").hidden =
       vat === 0;
 
@@ -121,14 +112,14 @@
   }
 
   function addRow(focusName) {
-    var row = template.content
+    const row = template.content
       .firstElementChild.cloneNode(true);
 
     rowNumber++;
 
-    var qty = row.querySelector(".js-qty");
-    var price = row.querySelector(".js-price");
-    var sum = row.querySelector(".js-sum");
+    const qty = row.querySelector(".js-qty");
+    const price = row.querySelector(".js-price");
+    const sum = row.querySelector(".js-sum");
 
     qty.id = "qty-" + rowNumber;
     price.id = "price-" + rowNumber;
@@ -165,10 +156,10 @@
   currencyInput.addEventListener("change", recalc);
 
   items.addEventListener("click", function (event) {
-    var button = event.target.closest(".js-remove");
+    const button = event.target.closest(".js-remove");
     if (!button) return;
 
-    var row = button.closest(".item");
+    const row = button.closest(".item");
 
     if (rows().length === 1) {
       clearRow(row);
@@ -185,13 +176,36 @@
       event.target.closest("button")
     ) return;
 
-    var row = event.target.closest(".item");
-    var list = rows();
+    const row = event.target.closest(".item");
+    const list = rows();
 
     if (!row || row !== list[list.length - 1]) return;
 
     event.preventDefault();
     addRow(true);
+  });
+
+  // Сохранение сметы в PDF через печать браузера
+  pdfButton.addEventListener("click", function () {
+    recalc();
+    window.print();
+  });
+
+  // Заголовок для печати
+  function updatePrintTitle() {
+    const number =
+      document.getElementById("number").value || "—";
+    const date = dateInput.value || "—";
+
+    document.querySelector(".hero h1").textContent =
+      "Смета № " + number + " от " + date;
+  }
+
+  window.addEventListener("beforeprint", updatePrintTitle);
+
+  window.addEventListener("afterprint", function () {
+    document.querySelector(".hero h1").textContent =
+      "Смета за 5 минут";
   });
 
   addRow(false);
