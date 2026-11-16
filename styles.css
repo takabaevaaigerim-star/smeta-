@@ -243,3 +243,33 @@ button:focus {
     font-size: 32px;
   }
 }
+/* Функция 2: скидка, НДС и валюта */
+
+.calculation-details {
+  margin-bottom: 20px;
+}
+
+.calculation-details p {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin: 10px 0;
+  font-size: 16px;
+}
+
+.calculation-details span {
+  font-weight: 600;
+  text-align: right;
+}
+
+.calculation-details [hidden] {
+  display: none !important;
+}
+
+#discount,
+#vat,
+#currency {
+  min-height: 44px;
+}
+
