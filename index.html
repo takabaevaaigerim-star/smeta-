@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Смета за 5 минут</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <h1>Смета за 5 минут</h1>
+      <p class="hint">Заполните реквизиты и позиции — сумма пересчитается сразу.</p>
+    </header>
+
+    <section class="card" aria-labelledby="details-title">
+      <h2 id="details-title">Реквизиты</h2>
+      <div class="details">
+        <label class="field">
+          <span class="caption">От кого</span>
+          <input id="from" name="from" type="text" autocomplete="organization">
+        </label>
+        <label class="field">
+          <span class="caption">Для кого</span>
+          <input id="to" name="to" type="text" autocomplete="organization">
+        </label>
+        <label class="field">
+          <span class="caption">Номер сметы</span>
+          <input id="number" name="number" type="text" autocomplete="off">
+        </label>
+        <label class="field">
+          <span class="caption">Дата</span>
+          <input id="date" name="date" type="date">
+        </label>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="items-title">
+      <h2 id="items-title">Позиции</h2>
+      <div class="items" id="items">
+        <div class="items-head" aria-hidden="true">
+          <span>Наименование</span>
+          <span>Количество</span>
+          <span>Единица</span>
+          <span>Цена</span>
+          <span>Сумма</span>
+          <span></span>
+        </div>
+      </div>
+      <button type="button" class="add-row" id="add-row">+ Добавить позицию</button>
+    </section>
+
+    <section class="card total-card" aria-live="polite">
+      <p class="total-label">Итого к оплате</p>
+      <p class="total-value" id="total">0 ₸</p>
+    </section>
+  </main>
+
+  <template id="row-template">
+    <div class="item">
+      <label class="field field-name">
+        <span class="caption">Наименование</span>
+        <input class="js-name" type="text" autocomplete="off">
+      </label>
+      <label class="field">
+        <span class="caption">Количество</span>
+        <input class="js-qty" type="text" inputmode="decimal" autocomplete="off">
+      </label>
+      <label class="field">
+        <span class="caption">Единица</span>
+        <select class="js-unit">
+          <option value="шт">шт</option>
+          <option value="час">час</option>
+          <option value="услуга">услуга</option>
+        </select>
+      </label>
+      <label class="field field-price">
+        <span class="caption">Цена</span>
+        <input class="js-price" type="text" inputmode="decimal" autocomplete="off">
+      </label>
+      <div class="field field-sum">
+        <span class="caption">Сумма</span>
+        <output class="js-sum">0 ₸</output>
+      </div>
+      <button type="button" class="remove js-remove" aria-label="Удалить позицию">✕</button>
+    </div>
+  </template>
+
+  <script src="script.js"></script>
+</body>
+</html>
