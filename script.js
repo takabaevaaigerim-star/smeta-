@@ -5,13 +5,14 @@
   const $ = (id) => document.getElementById(id);
   const items = $("items");
   const template = $("row-template");
-  const total = $("total");
   const discountInput = $("discount");
   const vatInput = $("vat");
   const currencyInput = $("currency");
   const dateInput = $("date");
 
   const STORAGE_KEY = "smeta-draft-v1";
+  const COMPANY_KEY = "smeta-my-company-v1";
+
   let rowNumber = 0;
   let statusTimer;
 
@@ -25,11 +26,14 @@
 
   function toNumber(raw) {
     if (raw == null) return 0;
+
     const text = String(raw)
       .replace(/\s/g, "")
       .replace(/[₸₽$€]/g, "")
       .replace(",", ".");
+
     if (!/^-?\d+(\.\d+)?$/.test(text)) return 0;
+
     const value = Number(text);
     return Number.isFinite(value) ? value : 0;
   }
@@ -37,6 +41,7 @@
   function money(amount) {
     const safe = Number.isFinite(amount) ? amount : 0;
     const rounded = Math.round(safe);
+
     const formatted = Math.abs(rounded)
       .toString()
       .replace(/\B(?=(\d{3})+(?!\d))/g, " ");
@@ -53,26 +58,45 @@
     let sum = 0;
 
     rows().forEach((row) => {
-      const qty = toNumber(row.querySelector(".js-qty").value);
-      const price = toNumber(row.querySelector(".js-price").value);
+      const qty = toNumber(
+        row.querySelector(".js-qty").value
+      );
+      const price = toNumber(
+        row.querySelector(".js-price").value
+      );
+
       const line = qty * price;
       const safeLine = Number.isFinite(line) ? line : 0;
 
       sum += safeLine;
-      row.querySelector(".js-sum").textContent = money(safeLine);
+
+      row.querySelector(".js-sum").textContent =
+        money(safeLine);
     });
 
     if (!Number.isFinite(sum)) sum = 0;
 
     const subtotal = Math.round(sum);
-    const discountRate = Math.min(
-      100, Math.max(0, toNumber(discountInput.value))
-    );
-    const vatRate = Math.max(0, toNumber(vatInput.value));
 
-    const discount = Math.round(subtotal * discountRate / 100);
+    const discountRate = Math.min(
+      100,
+      Math.max(0, toNumber(discountInput.value))
+    );
+
+    const vatRate = Math.max(
+      0,
+      toNumber(vatInput.value)
+    );
+
+    const discount = Math.round(
+      subtotal * discountRate / 100
+    );
+
     const afterDiscount = subtotal - discount;
-    const vat = Math.round(afterDiscount * vatRate / 100);
+    const vat = Math.round(
+      afterDiscount * vatRate / 100
+    );
+
     const finalTotal = afterDiscount + vat;
 
     $("subtotal").textContent = money(subtotal);
@@ -95,22 +119,38 @@
   }
 
   function addRow(focusName = false, data = {}) {
-    const row = template.content.firstElementChild.cloneNode(true);
+    const row = template.content.firstElementChild
+      .cloneNode(true);
+
     rowNumber++;
 
-    row.querySelector(".js-qty").id = "qty-" + rowNumber;
-    row.querySelector(".js-price").id = "price-" + rowNumber;
-    row.querySelector(".js-sum").id = "sum-" + rowNumber;
+    row.querySelector(".js-qty").id =
+      "qty-" + rowNumber;
 
-    row.querySelector(".js-name").value = data.name || "";
-    row.querySelector(".js-qty").value = data.qty ?? "";
-    row.querySelector(".js-price").value = data.price ?? "";
-    row.querySelector(".js-unit").value = data.unit || "шт";
+    row.querySelector(".js-price").id =
+      "price-" + rowNumber;
+
+    row.querySelector(".js-sum").id =
+      "sum-" + rowNumber;
+
+    row.querySelector(".js-name").value =
+      data.name || "";
+
+    row.querySelector(".js-qty").value =
+      data.qty ?? "";
+
+    row.querySelector(".js-price").value =
+      data.price ?? "";
+
+    row.querySelector(".js-unit").value =
+      data.unit || "шт";
 
     items.appendChild(row);
     calculate();
 
-    if (focusName) row.querySelector(".js-name").focus();
+    if (focusName) {
+      row.querySelector(".js-name").focus();
+    }
   }
 
   function getDraft() {
@@ -123,6 +163,7 @@
       vat: vatInput.value,
       currency: currencyInput.value,
       comment: $("comment").value,
+
       positions: rows().map((row) => ({
         name: row.querySelector(".js-name").value,
         qty: row.querySelector(".js-qty").value,
@@ -138,30 +179,47 @@
         STORAGE_KEY,
         JSON.stringify(getDraft())
       );
+
+      // Урок 7: отдельно запоминаем реквизиты компании.
+      localStorage.setItem(
+        COMPANY_KEY,
+        $("from").value
+      );
     } catch (error) {
-      console.warn("Не удалось сохранить черновик", error);
+      console.warn(
+        "Не удалось сохранить черновик",
+        error
+      );
     }
   }
 
   function restoreDraft() {
-    let draft;
+    let draft = null;
+    let savedCompany = "";
 
     try {
-      draft = JSON.parse(localStorage.getItem(STORAGE_KEY));
+      draft = JSON.parse(
+        localStorage.getItem(STORAGE_KEY)
+      );
+
+      savedCompany =
+        localStorage.getItem(COMPANY_KEY) || "";
     } catch (error) {
-      draft = null;
+      console.warn("Ошибка чтения черновика", error);
     }
 
     if (!draft || typeof draft !== "object") {
+      $("from").value = savedCompany;
       dateInput.value = today();
       addRow();
       return;
     }
 
-    $("from").value = draft.from || "";
+    $("from").value = savedCompany || draft.from || "";
     $("to").value = draft.to || "";
     $("number").value = draft.number || "1";
     dateInput.value = draft.date || today();
+
     discountInput.value = draft.discount ?? 0;
     vatInput.value = draft.vat ?? 0;
 
@@ -171,8 +229,13 @@
 
     $("comment").value = draft.comment || "";
 
-    if (Array.isArray(draft.positions) && draft.positions.length) {
-      draft.positions.forEach((position) => addRow(false, position));
+    if (
+      Array.isArray(draft.positions) &&
+      draft.positions.length
+    ) {
+      draft.positions.forEach((position) => {
+        addRow(false, position);
+      });
     } else {
       addRow();
     }
@@ -190,14 +253,13 @@
     saveDraft();
   });
 
-  items.addEventListener("input", update);
-  items.addEventListener("change", update);
-
-  document.querySelectorAll("input, select, textarea")
-    .forEach((field) => {
-      field.addEventListener("input", update);
-      field.addEventListener("change", update);
-    });
+  // Сохраняем все изменения в форме.
+  document.querySelectorAll(
+    "input, select, textarea"
+  ).forEach((field) => {
+    field.addEventListener("input", update);
+    field.addEventListener("change", update);
+  });
 
   items.addEventListener("click", (event) => {
     const button = event.target.closest(".js-remove");
@@ -218,9 +280,10 @@
   });
 
   items.addEventListener("keydown", (event) => {
-    if (event.key !== "Enter" || event.target.closest("button")) {
-      return;
-    }
+    if (
+      event.key !== "Enter" ||
+      event.target.closest("button")
+    ) return;
 
     const row = event.target.closest(".item");
     const list = rows();
@@ -232,17 +295,24 @@
     saveDraft();
   });
 
+  // Урок 7: при создании новой сметы
+  // название компании НЕ очищается.
   $("new-estimate").addEventListener("click", () => {
-    if (!confirm("Создать новую смету? Текущий черновик будет очищен.")) {
+    if (!confirm(
+      "Создать новую смету? Текущий черновик будет очищен."
+    )) {
       return;
     }
 
-    const nextNumber = (parseInt($("number").value, 10) || 0) + 1;
+    const company = $("from").value;
 
-    $("from").value = "";
+    const nextNumber =
+      (parseInt($("number").value, 10) || 0) + 1;
+
     $("to").value = "";
     $("number").value = String(nextNumber);
     dateInput.value = today();
+
     discountInput.value = "0";
     vatInput.value = "0";
     currencyInput.value = "₸";
@@ -250,6 +320,9 @@
 
     rows().forEach((row) => row.remove());
     addRow();
+
+    // Восстанавливаем реквизиты.
+    $("from").value = company;
 
     $("copy-fallback").hidden = true;
     $("copy-status").textContent = "";
@@ -270,24 +343,48 @@
     ];
 
     rows().forEach((row) => {
-      const name = row.querySelector(".js-name").value || "Без названия";
-      const qty = toNumber(row.querySelector(".js-qty").value);
-      const unit = row.querySelector(".js-unit").value;
-      const price = toNumber(row.querySelector(".js-price").value);
+      const name =
+        row.querySelector(".js-name").value.trim();
+
+      const qty = toNumber(
+        row.querySelector(".js-qty").value
+      );
+
+      const unit =
+        row.querySelector(".js-unit").value;
+
+      const price = toNumber(
+        row.querySelector(".js-price").value
+      );
+
       const line = qty * price;
 
+      // Не добавляем пустые позиции в сообщение.
+      if (!name && qty === 0 && price === 0) {
+        return;
+      }
+
       lines.push(
-        "• " + name + " — " + qty + " " + unit +
-        " × " + money(price) + " = " + money(line)
+        "• " + (name || "Без названия") +
+        " — " + qty + " " + unit +
+        " × " + money(price) +
+        " = " + money(line)
       );
     });
 
-    lines.push("", "Сумма: " + money(result.subtotal));
+    lines.push(
+      "",
+      "Сумма: " + money(result.subtotal)
+    );
 
     if (result.discount !== 0) {
-      lines.push("Скидка: " + money(-result.discount));
       lines.push(
-        "Сумма со скидкой: " + money(result.afterDiscount)
+        "Скидка: " + money(-result.discount)
+      );
+
+      lines.push(
+        "Сумма со скидкой: " +
+        money(result.afterDiscount)
       );
     }
 
@@ -295,41 +392,57 @@
       lines.push("НДС: " + money(result.vat));
     }
 
-    lines.push("Итого к оплате: " + money(result.finalTotal));
+    lines.push(
+      "Итого к оплате: " +
+      money(result.finalTotal)
+    );
 
     if ($("comment").value.trim()) {
-      lines.push("", "Комментарий: " + $("comment").value.trim());
+      lines.push(
+        "",
+        "Комментарий: " +
+        $("comment").value.trim()
+      );
     }
 
     return lines.join("\n");
   }
 
-  $("copy-whatsapp").addEventListener("click", async () => {
-    const text = whatsappText();
+  $("copy-whatsapp").addEventListener(
+    "click",
+    async () => {
+      const text = whatsappText();
 
-    try {
-      if (!navigator.clipboard?.writeText) {
-        throw new Error("Буфер обмена недоступен");
+      try {
+        if (!navigator.clipboard?.writeText) {
+          throw new Error(
+            "Буфер обмена недоступен"
+          );
+        }
+
+        await navigator.clipboard.writeText(text);
+
+        $("copy-fallback").hidden = true;
+        $("copy-status").textContent =
+          "Скопировано ✓";
+
+        clearTimeout(statusTimer);
+
+        statusTimer = setTimeout(() => {
+          $("copy-status").textContent = "";
+        }, 2000);
+
+      } catch (error) {
+        $("copy-fallback").hidden = false;
+        $("copy-text").value = text;
+        $("copy-text").focus();
+        $("copy-text").select();
+
+        $("copy-status").textContent =
+          "Скопируйте текст вручную (⌘ + C).";
       }
-
-      await navigator.clipboard.writeText(text);
-
-      $("copy-fallback").hidden = true;
-      $("copy-status").textContent = "Скопировано ✓";
-
-      clearTimeout(statusTimer);
-      statusTimer = setTimeout(() => {
-        $("copy-status").textContent = "";
-      }, 2000);
-    } catch (error) {
-      $("copy-fallback").hidden = false;
-      $("copy-text").value = text;
-      $("copy-text").focus();
-      $("copy-text").select();
-      $("copy-status").textContent =
-        "Выделите текст и скопируйте вручную (⌘ + C).";
     }
-  });
+  );
 
   $("save-pdf").addEventListener("click", () => {
     calculate();
@@ -340,13 +453,16 @@
     const number = $("number").value || "—";
     const date = dateInput.value || "—";
 
-    document.querySelector(".hero h1").textContent =
+    document.querySelector(
+      ".hero h1"
+    ).textContent =
       "Смета № " + number + " от " + date;
   });
 
   window.addEventListener("afterprint", () => {
-    document.querySelector(".hero h1").textContent =
-      "Смета за 5 минут";
+    document.querySelector(
+      ".hero h1"
+    ).textContent = "Смета за 5 минут";
   });
 
   restoreDraft();
