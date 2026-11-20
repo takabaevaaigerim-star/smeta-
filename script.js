@@ -50,6 +50,128 @@
       formatted + " " + currencyInput.value;
   }
 
+  // Урок 8: перевод числа в слова
+  function amountToWords(number) {
+    if (
+      !Number.isInteger(number) ||
+      number <= 0 ||
+      number > 999999999
+    ) {
+      return "";
+    }
+
+    const onesMale = [
+      "", "один", "два", "три", "четыре",
+      "пять", "шесть", "семь", "восемь", "девять"
+    ];
+
+    const onesFemale = [
+      "", "одна", "две", "три", "четыре",
+      "пять", "шесть", "семь", "восемь", "девять"
+    ];
+
+    const teens = [
+      "десять", "одиннадцать", "двенадцать",
+      "тринадцать", "четырнадцать",
+      "пятнадцать", "шестнадцать",
+      "семнадцать", "восемнадцать",
+      "девятнадцать"
+    ];
+
+    const tens = [
+      "", "", "двадцать", "тридцать",
+      "сорок", "пятьдесят", "шестьдесят",
+      "семьдесят", "восемьдесят", "девяносто"
+    ];
+
+    const hundreds = [
+      "", "сто", "двести", "триста",
+      "четыреста", "пятьсот", "шестьсот",
+      "семьсот", "восемьсот", "девятьсот"
+    ];
+
+    function groupWords(value, female) {
+      const words = [];
+
+      const h = Math.floor(value / 100);
+      const last = value % 100;
+
+      if (h > 0) words.push(hundreds[h]);
+
+      if (last >= 10 && last <= 19) {
+        words.push(teens[last - 10]);
+      } else {
+        const t = Math.floor(last / 10);
+        const u = last % 10;
+
+        if (t > 0) words.push(tens[t]);
+
+        if (u > 0) {
+          words.push(
+            (female ? onesFemale : onesMale)[u]
+          );
+        }
+      }
+
+      return words.join(" ");
+    }
+
+    function plural(value, one, few, many) {
+      const lastTwo = value % 100;
+      const lastOne = value % 10;
+
+      if (lastTwo >= 11 && lastTwo <= 14) {
+        return many;
+      }
+
+      if (lastOne === 1) return one;
+
+      if (lastOne >= 2 && lastOne <= 4) {
+        return few;
+      }
+
+      return many;
+    }
+
+    const millions = Math.floor(number / 1000000);
+    const thousands = Math.floor(number / 1000) % 1000;
+    const units = number % 1000;
+
+    const parts = [];
+
+    if (millions > 0) {
+      parts.push(groupWords(millions, false));
+      parts.push(
+        plural(
+          millions,
+          "миллион",
+          "миллиона",
+          "миллионов"
+        )
+      );
+    }
+
+    if (thousands > 0) {
+      parts.push(groupWords(thousands, true));
+      parts.push(
+        plural(
+          thousands,
+          "тысяча",
+          "тысячи",
+          "тысяч"
+        )
+      );
+    }
+
+    if (units > 0) {
+      parts.push(groupWords(units, false));
+    }
+
+    const text = parts.join(" ").trim() + " тенге";
+
+    return text.charAt(0).toUpperCase() + text.slice(1);
+  }
+
   function rows() {
     return Array.from(items.querySelectorAll(".item"));
   }
@@ -61,6 +183,7 @@
       const qty = toNumber(
         row.querySelector(".js-qty").value
       );
+
       const price = toNumber(
         row.querySelector(".js-price").value
       );
@@ -109,12 +232,21 @@
     $("after-discount-row").hidden = discount === 0;
     $("vat-row").hidden = vat === 0;
 
+    // Показываем сумму прописью только для тенге.
+    const words = currencyInput.value === "₸"
+      ? amountToWords(finalTotal)
+      : "";
+
+    $("amount-words").hidden = !words;
+    $("amount-words-text").textContent = words;
+
     return {
       subtotal,
       discount,
       afterDiscount,
       vat,
-      finalTotal
+      finalTotal,
+      words
     };
   }
 
@@ -180,7 +312,6 @@
         JSON.stringify(getDraft())
       );
 
-      // Урок 7: отдельно запоминаем реквизиты компании.
       localStorage.setItem(
         COMPANY_KEY,
         $("from").value
@@ -253,7 +384,6 @@
     saveDraft();
   });
 
-  // Сохраняем все изменения в форме.
   document.querySelectorAll(
     "input, select, textarea"
   ).forEach((field) => {
@@ -295,8 +425,6 @@
     saveDraft();
   });
 
-  // Урок 7: при создании новой сметы
-  // название компании НЕ очищается.
   $("new-estimate").addEventListener("click", () => {
     if (!confirm(
       "Создать новую смету? Текущий черновик будет очищен."
@@ -321,7 +449,6 @@
     rows().forEach((row) => row.remove());
     addRow();
 
-    // Восстанавливаем реквизиты.
     $("from").value = company;
 
     $("copy-fallback").hidden = true;
@@ -359,7 +486,6 @@
 
       const line = qty * price;
 
-      // Не добавляем пустые позиции в сообщение.
       if (!name && qty === 0 && price === 0) {
         return;
       }
@@ -396,6 +522,13 @@
       "Итого к оплате: " +
       money(result.finalTotal)
     );
+
+    // Сумма прописью сразу после итога.
+    if (result.words) {
+      lines.push(
+        "Сумма прописью: " + result.words
+      );
+    }
 
     if ($("comment").value.trim()) {
       lines.push(

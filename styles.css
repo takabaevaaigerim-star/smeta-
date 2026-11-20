@@ -190,6 +190,13 @@ button {
   margin: 10px 0 0;
 }
 
+.amount-words {
+  margin-top: 16px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: #526459;
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;
@@ -390,6 +397,13 @@ button {
   .total-value {
     font-size: 22px;
     color: black !important;
+  }
+
+  .amount-words {
+    color: black !important;
+    font-size: 12px;
+    text-align: right;
+    break-inside: avoid;
   }
 
   .print-signature {

@@ -9,7 +9,6 @@
 </head>
 <body>
   <main class="page">
-
     <header class="hero">
       <h1>Смета за 5 минут</h1>
       <p class="hint">
@@ -110,17 +109,21 @@
           <span id="vat-amount">0 ₸</span>
         </p>
       </div>
+
       <p class="total-label">Итого к оплате</p>
       <p class="total-value" id="total">0 ₸</p>
+
+      <p id="amount-words" class="amount-words" hidden>
+        <strong>Сумма прописью:</strong>
+        <span id="amount-words-text"></span>
+      </p>
     </section>
 
     <section class="actions">
-      <button type="button" id="save-pdf"
-              class="add-row">
+      <button type="button" id="save-pdf" class="add-row">
         Сохранить PDF
       </button>
-      <button type="button" id="copy-whatsapp"
-              class="add-row">
+      <button type="button" id="copy-whatsapp" class="add-row">
         Скопировать для WhatsApp
       </button>
       <button type="button" id="new-estimate"
@@ -133,9 +136,7 @@
 
     <div id="copy-fallback" hidden>
       <label class="field">
-        <span class="caption">
-          Скопируйте текст вручную
-        </span>
+        <span class="caption">Скопируйте текст вручную</span>
         <textarea id="copy-text" rows="8" readonly></textarea>
       </label>
     </div>
